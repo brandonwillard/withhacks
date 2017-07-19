@@ -120,7 +120,7 @@ def extract_code(frame,start=None,end=None,name="<withhack>"):
             start_b = i
         if at == end_c:
             end_b = i
-        if isinstance(b, bytecode.instr.BaseInstr):
+        if isinstance(b, bytecode.instr.Instr):
             at += 1
     assert at == len(concrete_bc)
 
@@ -132,7 +132,7 @@ def load_name(frame,name):
     """Get the value of the named variable, as seen by the given frame.
 
     The name is first looked for in f_locals, then f_globals, and finally
-    f_builtins.  If it's not defined in any of these scopes, NameError 
+    f_builtins.  If it's not defined in any of these scopes, NameError
     is raised.
     """
     try:

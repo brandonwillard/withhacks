@@ -28,7 +28,6 @@ setup(name=NAME,
       long_description=LONG_DESC,
       license=LICENSE,
       keywords=KEYWORDS,
-      packages=["withhacks","withhacks.tests"],
+      packages=["withhacks", "withhacks.tests"],
       install_requires=['bytecode']
-     )
-
+      )

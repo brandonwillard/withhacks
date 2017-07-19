@@ -3,7 +3,7 @@
   withhacks:  building blocks for with-statement-related hackery
 
 This module is a collection of useful building-blocks for hacking the Python
-"with" statement.  It combines ideas from several neat with-statement hacks 
+"with" statement.  It combines ideas from several neat with-statement hacks
 I found around the internet into a suite of re-usable components:
 
   * http://www.mechanicalcat.net/richard/log/Python/Something_I_m_working_on.3
@@ -41,8 +41,8 @@ __ver_major__ = 0
 __ver_minor__ = 1
 __ver_patch__ = 1
 __ver_sub__ = ""
-__version__ = "%d.%d.%d%s" % (__ver_major__,__ver_minor__,
-                              __ver_patch__,__ver_sub__)
+__version__ = "%d.%d.%d%s" % (__ver_major__, __ver_minor__,
+                              __ver_patch__, __ver_sub__)
 
 import sys
 import types
@@ -73,7 +73,6 @@ class _Bucket:
     pass
 
 
-
 class WithHack(object):
     """Base class for with-statement-related hackery.
 
@@ -98,7 +97,7 @@ class WithHack(object):
         """Get the frame object corresponding to the with-statement context.
 
         This is designed to work from within superclass method call. It finds
-        the first frame in which the variable "self" is not bound to this 
+        the first frame in which the variable "self" is not bound to this
         object.  While this heuristic rules out some strange uses of WithHack
         objects (such as entering on object inside its own __exit__ method)
         it should suffice in practise.
@@ -113,14 +112,14 @@ class WithHack(object):
             self.__frame = f
             return f
 
-    def _set_context_locals(self,locals):
+    def _set_context_locals(self, locals):
         """Set local variables in the with-statement context.
 
         The argument "locals" is a dictionary of name bindings to be inserted
         into the execution context of the with-statement.
         """
         frame = self._get_context_frame()
-        inject_trace_func(frame,lambda frame: frame.f_locals.update(locals))
+        inject_trace_func(frame, lambda frame: frame.f_locals.update(locals))
 
     def __enter__(self):
         """Enter the context of this WithHack.
@@ -131,10 +130,10 @@ class WithHack(object):
         """
         if self.dont_execute and not self.must_execute:
             frame = self._get_context_frame()
-            inject_trace_func(frame,_exit_context)
+            inject_trace_func(frame, _exit_context)
         return self
 
-    def __exit__(self,exc_type,exc_value,traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
         """Enter the context of this WithHack.
 
         This is usually where all the interesting hackery takes place.
@@ -168,18 +167,18 @@ class CaptureBytecode(WithHack):
         self.__bc_start = None
         self.bytecode = None
         self._as_clause = None
-        super(CaptureBytecode,self).__init__()
+        super(CaptureBytecode, self).__init__()
 
     def __enter__(self):
         self.__bc_start = self._get_context_frame().f_lasti
-        return super(CaptureBytecode,self).__enter__()
+        return super(CaptureBytecode, self).__enter__()
 
-    def __exit__(self,*args):
+    def __exit__(self, *args):
         frame = self._get_context_frame()
-        bc = extract_code(frame,self.__bc_start,frame.f_lasti)
+        bc = extract_code(frame, self.__bc_start, frame.f_lasti)
 
         # Remove code setting up the with-statement block.
-        while not isinstance(bc[0], bytecode.instr.BaseInstr) or bc[0].name != 'SETUP_WITH':
+        while not isinstance(bc[0], bytecode.instr.Instr) or bc[0].name != 'SETUP_WITH':
             bc[:] = bc[1:]
         bc[:] = bc[1:]
 
@@ -190,17 +189,17 @@ class CaptureBytecode(WithHack):
             as_clause.append(instr)
             if instr.name.startswith('STORE') or instr.name == 'POP_TOP':
                 break
-        bc[:] = bc[i+1:]
+        bc[:] = bc[i + 1:]
         self._as_clause = as_clause
 
         # remove code tearing down the with-statement block
-        while not isinstance(bc[-1], bytecode.instr.BaseInstr) or bc[-1].name != 'POP_BLOCK':
+        while not isinstance(bc[-1], bytecode.instr.Instr) or bc[-1].name != 'POP_BLOCK':
             bc[:] = bc[:-1]
         bc[:] = bc[:-1]
 
         # save the trimmed bytecode
         self.bytecode = bc
-        return super(CaptureBytecode,self).__exit__(*args)
+        return super(CaptureBytecode, self).__exit__(*args)
 
     def _run_as_clause(self, value):
         """
@@ -254,7 +253,6 @@ class CaptureBytecode(WithHack):
         raw_code = concrete_code.to_code()
         exec(raw_code, frame.f_globals, frame.f_locals)
 
-
     def _change_lookups(self, code, *, args=(), locals=()):
         """
         Switch name access opcodes as appropriate.
@@ -264,25 +262,25 @@ class CaptureBytecode(WithHack):
         TODO: does this work for STORE_FAST, DELETE_FAST?
         """
         for instr in code:
-            if not isinstance(instr, bytecode.instr.BaseInstr):
+            if not isinstance(instr, bytecode.instr.Instr):
                 continue
-            if instr.name in ('LOAD_FAST','LOAD_DEREF','LOAD_NAME','LOAD_GLOBAL'):
+            if instr.name in ('LOAD_FAST', 'LOAD_DEREF', 'LOAD_NAME', 'LOAD_GLOBAL'):
                 if instr.arg in args:
                     instr.name = 'LOAD_FAST'
-                elif instr.name in ('LOAD_FAST','LOAD_DEREF',):
+                elif instr.name in ('LOAD_FAST', 'LOAD_DEREF',):
                     if instr.arg in locals:
                         instr.name = 'LOAD_NAME'
                     else:
                         instr.name = 'LOAD_FAST'
-            elif instr.name in ('STORE_FAST','STORE_DEREF','STORE_NAME','STORE_GLOBAL'):
+            elif instr.name in ('STORE_FAST', 'STORE_DEREF', 'STORE_NAME', 'STORE_GLOBAL'):
                 if instr.arg in args:
                     instr.name = 'STORE_FAST'
-                elif instr.name in ('STORE_FAST','STORE_DEREF',):
+                elif instr.name in ('STORE_FAST', 'STORE_DEREF',):
                     if instr.arg in locals:
                         instr.name = 'STORE_NAME'
                     else:
                         instr.name = 'STORE_FAST'
-            elif instr.name in ('DELETE_FAST','DELETE_NAME','DELETE_GLOBAL'):
+            elif instr.name in ('DELETE_FAST', 'DELETE_NAME', 'DELETE_GLOBAL'):
                 if instr.arg in args:
                     instr.name = 'DELETE_FAST'
                 elif instr.name in ('DELETE_FAST',):
@@ -318,18 +316,18 @@ class CaptureFunction(CaptureBytecode):
 
     """
 
-    def __init__(self,args=[],varargs=False,varkwargs=False,name="<withhack>",
-                      argdefs=()):
+    def __init__(self, args=[], varargs=False, varkwargs=False, name="<withhack>",
+                 argdefs=()):
         self.__args = args
         self.__varargs = varargs
         self.__varkwargs = varkwargs
         self.__name = name
         self.__argdefs = argdefs
-        super(CaptureFunction,self).__init__()
+        super(CaptureFunction, self).__init__()
 
-    def __exit__(self,*args):
+    def __exit__(self, *args):
         frame = self._get_context_frame()
-        retcode = super(CaptureFunction,self).__exit__(*args)
+        retcode = super(CaptureFunction, self).__exit__(*args)
         funcode = copy.copy(self.bytecode)
         #  Ensure it's a properly formed func by always returning something
         funcode.append(bytecode.Instr('LOAD_CONST', None))
@@ -353,14 +351,14 @@ class CaptureFunction(CaptureBytecode):
         gs = self._get_context_frame().f_globals
         nm = self.__name
         defs = self.__argdefs
-        self.function = types.FunctionType(funcode.to_code(),gs,nm,defs)
+        self.function = types.FunctionType(funcode.to_code(), gs, nm, defs)
         return retcode
 
 
 class CaptureLocals(CaptureBytecode):
     """WithHack to capture any local variables assigned to in the block.
 
-    When the block exits, the attribute "locals" will be a dictionary 
+    When the block exits, the attribute "locals" will be a dictionary
     containing any local variables that were assigned to during the execution
     of the block.
 
@@ -377,13 +375,13 @@ class CaptureLocals(CaptureBytecode):
     must_execute = True
     dest_type = dict
 
-    def __exit__(self,*args):
-        retcode = super(CaptureLocals,self).__exit__(*args)
+    def __exit__(self, *args):
+        retcode = super(CaptureLocals, self).__exit__(*args)
         frame = self._get_context_frame()
         self.locals = self.dest_type()
         for instr in self.bytecode:
-           if instr.name in ('STORE_FAST','STORE_NAME'):
-               self.locals[instr.arg] = frame.f_locals[instr.arg]
+            if instr.name in ('STORE_FAST', 'STORE_NAME'):
+                self.locals[instr.arg] = frame.f_locals[instr.arg]
         return retcode
 
 
@@ -410,7 +408,7 @@ class CaptureOrderedLocals(CaptureLocals):
 class CaptureModifiedLocals(WithHack):
     """WithHack to capture any local variables modified in the block.
 
-    When the block exits, the attribute "locals" will be a dictionary 
+    When the block exits, the attribute "locals" will be a dictionary
     containing any local variables that were created or modified during the
     execution of the block.
 
@@ -432,12 +430,12 @@ class CaptureModifiedLocals(WithHack):
     def __enter__(self):
         frame = self._get_context_frame()
         self.__pre_locals = frame.f_locals.copy()
-        return super(CaptureModifiedLocals,self).__enter__()
+        return super(CaptureModifiedLocals, self).__enter__()
 
-    def __exit__(self,*args):
+    def __exit__(self, *args):
         frame = self._get_context_frame()
         self.locals = {}
-        for (name,value) in frame.f_locals.items():
+        for (name, value) in frame.f_locals.items():
             if value is self:
                 pass
             elif name not in self.__pre_locals:
@@ -445,13 +443,13 @@ class CaptureModifiedLocals(WithHack):
             elif self.__pre_locals[name] != value:
                 self.locals[name] = value
         del self.__pre_locals
-        return super(CaptureModifiedLocals,self).__exit__(*args)
+        return super(CaptureModifiedLocals, self).__exit__(*args)
 
 
 class xargs(CaptureOrderedLocals):
     """WithHack to call a function with arguments defined in the block.
 
-    This WithHack captures the value of any local variables created or 
+    This WithHack captures the value of any local variables created or
     modified in the scope of the block, then passes those values as extra
     positional arguments to the given function call.  The result of the
     function call is stored in the "as" variable if given.
@@ -467,22 +465,22 @@ class xargs(CaptureOrderedLocals):
 
     """
 
-    def __init__(self,func,*args,**kwds):
+    def __init__(self, func, *args, **kwds):
         self.__func = func
         self.__args = args
         self.__kwds = kwds
-        super(xargs,self).__init__()
+        super(xargs, self).__init__()
 
-    def __exit__(self,*args):
-        retcode = super(xargs,self).__exit__(*args)
+    def __exit__(self, *args):
+        retcode = super(xargs, self).__exit__(*args)
         args_ = [arg for arg in self.__args]
-        args_.extend([arg for (nm,arg) in self.locals.items()])
-        retval = self.__func(*args_,**self.__kwds)
+        args_.extend([arg for (nm, arg) in self.locals.items()])
+        retval = self.__func(*args_, **self.__kwds)
         self._run_as_clause(retval)
         return retcode
 
 
-class xkwargs(CaptureLocals,CaptureBytecode):
+class xkwargs(CaptureLocals, CaptureBytecode):
     """WithHack calling a function with extra keyword arguments.
 
     This WithHack captures any local variables created during execution of
@@ -500,17 +498,17 @@ class xkwargs(CaptureLocals,CaptureBytecode):
 
     """
 
-    def __init__(self,func,*args,**kwds):
+    def __init__(self, func, *args, **kwds):
         self.__func = func
         self.__args = args
         self.__kwds = kwds
-        super(xkwargs,self).__init__()
+        super(xkwargs, self).__init__()
 
-    def __exit__(self,*args):
-        retcode = super(xkwargs,self).__exit__(*args)
+    def __exit__(self, *args):
+        retcode = super(xkwargs, self).__exit__(*args)
         kwds = self.__kwds.copy()
         kwds.update(self.locals)
-        retval = self.__func(*self.__args,**kwds)
+        retval = self.__func(*self.__args, **kwds)
         self._run_as_clause(retval)
         return retcode
 
@@ -546,16 +544,16 @@ class namespace(CaptureBytecode):
 
     """
 
-    def __init__(self,ns=None):
+    def __init__(self, ns=None):
         if ns is None:
             self.namespace = _Bucket()
         else:
             self.namespace = ns
-        super(namespace,self).__init__()
+        super(namespace, self).__init__()
 
-    def __exit__(self,*args):
+    def __exit__(self, *args):
         frame = self._get_context_frame()
-        retcode = super(namespace,self).__exit__(*args)
+        retcode = super(namespace, self).__exit__(*args)
         # funcode = copy.deepcopy(self.bytecode)
         funcode = copy.copy(self.bytecode)
         #  Ensure it's a properly formed func by always returning something
@@ -569,14 +567,14 @@ class namespace(CaptureBytecode):
                 to_replace.append((i, repl))
         offset = 0
         for i, repl in to_replace:
-            funcode[i+offset:i+offset+1] = repl
+            funcode[i + offset:i + offset + 1] = repl
             offset += len(repl) - 1
         #  Create function object to do the manipulation
         funcode.argnames = ("_[namespace]",)
         funcode.argcount = 1
         funcode.name = "<withhack>"
         gs = self._get_context_frame().f_globals
-        func = types.FunctionType(funcode.to_code(),gs)
+        func = types.FunctionType(funcode.to_code(), gs)
         #  Execute bytecode in context of namespace
         retval = func(self.namespace)
 
@@ -587,39 +585,44 @@ class namespace(CaptureBytecode):
     def _replace_opcode(self, instr, frame, *,
                         _load=lambda i: [bytecode.Instr('LOAD_ATTR', i.arg)],
                         _store=lambda i: [bytecode.Instr('STORE_ATTR', i.arg)],
-                        _delete=lambda i: [bytecode.Instr('DELETE_ATTR', i.arg)],
+                        _delete=lambda i: [
+                            bytecode.Instr('DELETE_ATTR', i.arg)],
                         _exc=AttributeError):
         Instr = bytecode.Instr
         Label = bytecode.Label
 
-        if instr.name in ('STORE_FAST','STORE_NAME',):
-            return [Instr('LOAD_FAST',"_[namespace]")] + _store(instr)
-        if instr.name in ('DELETE_FAST','DELETE_NAME',):
-            return [Instr('LOAD_FAST',"_[namespace]")] + _delete(instr)
-        if instr.name in ('LOAD_FAST','LOAD_NAME','LOAD_GLOBAL','LOAD_DEREF'):
-            excIn = Label(); excOut = Label(); end = Label()
+        if instr.name in ('STORE_FAST', 'STORE_NAME',):
+            return [Instr('LOAD_FAST', "_[namespace]")] + _store(instr)
+        if instr.name in ('DELETE_FAST', 'DELETE_NAME',):
+            return [Instr('LOAD_FAST', "_[namespace]")] + _delete(instr)
+        if instr.name in ('LOAD_FAST', 'LOAD_NAME', 'LOAD_GLOBAL', 'LOAD_DEREF'):
+            excIn = Label()
+            excOut = Label()
+            end = Label()
             # try:
             #     x = namespace.<attr>
             # except AttributeError:
             #     x = load_name(frame, '<attr>')
-            return [Instr('SETUP_EXCEPT',excIn),
-                        Instr('LOAD_FAST',"_[namespace]")] + _load(instr) + [
-                        Instr('STORE_FAST',"_[ns_value]"),
-                        Instr('POP_BLOCK'), Instr('JUMP_FORWARD',end),
-                    excIn,
-                        Instr('DUP_TOP'), Instr('LOAD_CONST',_exc),
-                        Instr('COMPARE_OP',bytecode.Compare.EXC_MATCH),
-                        Instr('POP_JUMP_IF_FALSE',excOut), Instr('POP_TOP'),
-                        Instr('POP_TOP'), Instr('POP_TOP'),
-                        Instr('LOAD_CONST',load_name), Instr('LOAD_CONST',frame),
-                        Instr('LOAD_CONST',instr.arg), Instr('CALL_FUNCTION',2),
-                        Instr('STORE_FAST',"_[ns_value]"),
-                        Instr('POP_EXCEPT'),
-                        Instr('JUMP_FORWARD',end),
-                    excOut,
-                        Instr('END_FINALLY'),
-                    end,
-                        Instr('LOAD_FAST',"_[ns_value]")]
+            return [Instr('SETUP_EXCEPT', excIn),
+                    Instr('LOAD_FAST', "_[namespace]")] + _load(instr) + [
+                Instr('STORE_FAST', "_[ns_value]"),
+                Instr('POP_BLOCK'), Instr('JUMP_FORWARD', end),
+                excIn,
+                Instr('DUP_TOP'), Instr('LOAD_CONST', _exc),
+                Instr('COMPARE_OP', bytecode.Compare.EXC_MATCH),
+                Instr('POP_JUMP_IF_FALSE', excOut), Instr('POP_TOP'),
+                Instr('POP_TOP'), Instr('POP_TOP'),
+                        Instr('LOAD_CONST', load_name), Instr(
+                            'LOAD_CONST', frame),
+                        Instr('LOAD_CONST', instr.arg), Instr(
+                            'CALL_FUNCTION', 2),
+                Instr('STORE_FAST', "_[ns_value]"),
+                Instr('POP_EXCEPT'),
+                Instr('JUMP_FORWARD', end),
+                excOut,
+                Instr('END_FINALLY'),
+                end,
+                Instr('LOAD_FAST', "_[ns_value]")]
         return None
 
 
@@ -653,17 +656,19 @@ class keyspace(namespace):
 
     """
 
-    def __init__(self,ns=None):
+    def __init__(self, ns=None):
         if ns is None:
             ns = {}
-        super(keyspace,self).__init__(ns)
+        super(keyspace, self).__init__(ns)
 
     def _replace_opcode(self, instr, frame):
         Instr = bytecode.Instr
         return super()._replace_opcode(instr, frame,
-            _load=lambda i: [Instr('LOAD_CONST', i.arg), Instr('BINARY_SUBSCR')],
-            _store=lambda i: [Instr('LOAD_CONST', i.arg), Instr('STORE_SUBSCR')],
-            _delete=lambda i: [Instr('LOAD_CONST', i.arg), Instr('DELETE_SUBSCR')],
-            _exc=KeyError
-        )
-
+                                       _load=lambda i: [
+                                           Instr('LOAD_CONST', i.arg), Instr('BINARY_SUBSCR')],
+                                       _store=lambda i: [
+                                           Instr('LOAD_CONST', i.arg), Instr('STORE_SUBSCR')],
+                                       _delete=lambda i: [
+                                           Instr('LOAD_CONST', i.arg), Instr('DELETE_SUBSCR')],
+                                       _exc=KeyError
+                                       )
