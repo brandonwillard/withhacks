@@ -49,6 +49,7 @@ import types
 import copy
 import inspect
 import bytecode
+import shelve
 
 try:
     import threading
@@ -245,7 +246,8 @@ class CaptureBytecode(WithHack):
 
     def __exit__(self, *args):
         frame = self._get_context_frame()
-        self.bytecode, self._as_clause = frame_to_bytecode(frame, self.__bc_start)
+        self.bytecode, self._as_clause = frame_to_bytecode(
+            frame, self.__bc_start)
         return super(CaptureBytecode, self).__exit__(*args)
 
     def _run_as_clause(self, value):
@@ -687,12 +689,14 @@ class keyspace(namespace):
 
 class CacheLocals(CaptureBytecode):
 
-    def __init__(self, cache_file, **kwargs):
+    def __init__(self, cache_file, cache_vars=set(), **kwargs):
 
         self.dont_execute = True
         self.must_execute = False
         self.with_sourcelines = None
         self.cache_file = cache_file
+        self.cache_vars = cache_vars
+        self.last_cache_invalid = True
 
         super(CacheLocals, self).__init__(**kwargs)
 
@@ -727,6 +731,8 @@ class CacheLocals(CaptureBytecode):
             else:
                 cache_invalid = True
 
+        self.last_cache_invalid = cache_invalid
+
         if cache_invalid:
             # Cache miss; execute code and store results.
             exec(funcode, frame.f_globals, frame.f_locals)
@@ -750,7 +756,6 @@ class CacheLocals(CaptureBytecode):
 
         retcode = super(CacheLocals, self).__exit__(*args)
 
-
         funcode = copy.copy(self.bytecode)
         funcode.append(bytecode.Instr('LOAD_CONST', None))
         funcode.append(bytecode.Instr('RETURN_VALUE'))
@@ -764,12 +769,9 @@ class CacheLocals(CaptureBytecode):
             if getattr(instr, 'name', None) in ('STORE_FAST', 'STORE_NAME'):
                 # TODO: Could we use the code leading up to a variable as a
                 # hash?
-                assigned_locals[instr.arg] = bytecode.Bytecode(funcode[:i+1])
+                assigned_locals[instr.arg] = bytecode.Bytecode(funcode[:i + 1])
 
         self._get_cached(funcode.to_code(), assigned_locals)
         self.assigned_locals = assigned_locals
 
         return retcode
-
-
-
